@@ -13,11 +13,38 @@ type Record struct {
 	Name string `json:name`
 }
 
-func main() {
-	fmt.Println("hola")
+type Results struct {
+	InputCount int
+	OuputCount int
+}
 
-	// CSV reader
-	inputFileName := get_file_name()
+func main() {
+	fmt.Println("START")
+
+	inputFileName := getFileName()
+	results := readAndWriteCSV(inputFileName)
+
+	fmt.Println(results.OuputCount)
+	fmt.Println("END")
+}
+
+func getFileName() string {
+	regex, _ := regexp.Compile(`^.*ARS_report\.csv$`)
+
+	files, _ := os.ReadDir(".")
+	var file_name string
+
+	for _, file := range files {
+		if file.Type().IsRegular() && regex.MatchString(file.Name()) {
+			file_name = file.Name()
+		}
+	}
+
+	return file_name
+}
+
+func readAndWriteCSV(inputFileName string) Results {
+	// Reader
 	file, err := os.Open(inputFileName)
 	if err != nil {
 		fmt.Println(err)
@@ -27,28 +54,9 @@ func main() {
 
 	reader := csv.NewReader(file)
 	reader.Comma = ';'
-	var recordsToSave []Record
 
-	count := 0
-	for {
-		row, err := reader.Read()
-		if err != nil {
-			break
-		}
-		if count == 0 {
-			count++
-			continue
-		}
 
-		record := Record{
-			Id: row[0],
-			Name: row[1],
-		}
-
-		recordsToSave = append(recordsToSave, record)
-	}
-
-	// CSV writer
+	// Writer
 	outputFileName := strings.ReplaceAll(inputFileName, "report", "wallet_report")
 	outputFile, err := os.Create(outputFileName)
 	if err != nil {
@@ -64,32 +72,40 @@ func main() {
 	header := []string{"id", "name"}
 	_ = writer.Write(header)
 
-	for _, record := range recordsToSave {
-		row := []string{
-			record.Id,
-			record.Name,
+
+	// Process
+	inputCount := 0
+	outputCount := 0
+	for {
+		row, err := reader.Read()
+		if err != nil {
+			break
 		}
+		if inputCount == 0 {
+			inputCount++
+			continue
+		}
+		inputCount++
+
+		// record := Record{
+		// 	Id: row[0],
+		// 	Name: row[1],
+		// }
+
+		// TODO cuentas/validaciones
+
 
 		if err := writer.Write(row); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-	}
-	
-	fmt.Println("listo")
-}
-
-func get_file_name() string {
-	regex, _ := regexp.Compile(`^.*ARS_report\.csv$`)
-
-	files, _ := os.ReadDir(".")
-	var file_name string
-
-	for _, file := range files {
-		if file.Type().IsRegular() && regex.MatchString(file.Name()) {
-			file_name = file.Name()
-		}
+		outputCount++
 	}
 
-	return file_name
+	fmt.Println("Se procesaron CSVs")
+	results := Results{
+		InputCount: inputCount,
+		OuputCount: outputCount,
+	}
+	return results
 }
