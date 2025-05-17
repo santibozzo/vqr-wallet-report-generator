@@ -6,27 +6,51 @@ import (
 	"regexp"
 	"encoding/csv"
 	"strings"
+	"strconv"
 )
 
+// TYPES
+
 type Record struct {
-	Id string `json:id`
-	Name string `json:name`
+	RideId string `json:ride_id`
+	PaymentId string `json:payment_id`
+	ExternalReference string `json:external_reference`
+	NetAmount float64 `json:net_amount`
+	GrossAmount float64 `json:gross_amount`
+	Fee string `json:fee`
+	Currency string `json:currency`
+	Status string `json:status`
+	StatusDetail string `json:status_detail`
+	IssuerId string `json:issuer_id`
+	TransportOperator string `json:transport_operator`
+	Debt string `json:debt`
+	Forced string `json:forced`
+	FeatureFlags string `json:feature_flags`
+	ScannedAt string `json:scanned_at`
+	CreatedAt string `json:created_at`
+	ProcessedAt string `json:processed_at`
 }
 
 type Results struct {
 	InputCount int
-	OuputCount int
+	OutputCount int
+	GrossAmount float64
+	NetAmount float64
 }
+
+// MAIN
 
 func main() {
 	fmt.Println("START")
 
 	inputFileName := getFileName()
 	results := readAndWriteCSV(inputFileName)
+	writeResults(results)
 
-	fmt.Println(results.OuputCount)
 	fmt.Println("END")
 }
+
+// FUNCTIONS
 
 func getFileName() string {
 	regex, _ := regexp.Compile(`^.*ARS_report\.csv$`)
@@ -43,7 +67,12 @@ func getFileName() string {
 	return file_name
 }
 
+func isApproved(record Record) bool {
+	return strings.HasPrefix(record.Status, "APPROVED")
+}
+
 func readAndWriteCSV(inputFileName string) Results {
+	fmt.Println("Procesando " + inputFileName)
 	// Reader
 	file, err := os.Open(inputFileName)
 	if err != nil {
@@ -69,13 +98,34 @@ func readAndWriteCSV(inputFileName string) Results {
 	writer.Comma = ';'
 	defer writer.Flush()
 
-	header := []string{"id", "name"}
+	header := []string{
+		"ride_id",
+		"payment_id",
+		"external_reference",
+		"net_amount",
+		"gross_amount",
+		"fee",
+		"currency",
+		"status",
+		"status_detail",
+		"issuer_id",
+		"transport_operator",
+		"debt",
+		"forced",
+		"feature_flags",
+		"scanned_at",
+		"created_at",
+		"processed_at",
+	}
 	_ = writer.Write(header)
 
 
 	// Process
 	inputCount := 0
 	outputCount := 0
+	grossAmount := 0.0
+	netAmount := 0.0
+
 	for {
 		row, err := reader.Read()
 		if err != nil {
@@ -87,25 +137,52 @@ func readAndWriteCSV(inputFileName string) Results {
 		}
 		inputCount++
 
-		// record := Record{
-		// 	Id: row[0],
-		// 	Name: row[1],
-		// }
-
-		// TODO cuentas/validaciones
-
-
-		if err := writer.Write(row); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+		recordNetAmount, _ := strconv.ParseFloat(row[3], 64)
+		recordGrossAmount, _ := strconv.ParseFloat(row[4], 64)
+		record := Record{
+			RideId:            row[0],
+			PaymentId:         row[1],
+			ExternalReference: row[2],
+			NetAmount:         recordNetAmount,
+			GrossAmount:       recordGrossAmount,
+			Fee:               row[5],
+			Currency:          row[6],
+			Status:            row[7],
+			StatusDetail:      row[8],
+			IssuerId:          row[9],
+			TransportOperator: row[10],
+			Debt:              row[11],
+			Forced:            row[12],
+			FeatureFlags:      row[13],
+			ScannedAt:         row[14],
+			CreatedAt:         row[15],
+			ProcessedAt:       row[16],
 		}
-		outputCount++
+
+		if isApproved(record) {
+			if err := writer.Write(row); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			outputCount++
+			netAmount += record.NetAmount
+			grossAmount += record.GrossAmount
+		}
 	}
 
 	fmt.Println("Se procesaron CSVs")
 	results := Results{
 		InputCount: inputCount,
-		OuputCount: outputCount,
+		OutputCount: outputCount,
+		GrossAmount: grossAmount,
+		NetAmount: netAmount,
 	}
 	return results
+}
+
+func writeResults(results Results) {
+	fmt.Printf("Input count: %d\n", results.InputCount)
+	fmt.Printf("Output count: %d\n", results.OutputCount)
+	fmt.Printf("Gross amount: %f\n", results.GrossAmount)
+	fmt.Printf("Net amount: %f\n", results.NetAmount)
 }
