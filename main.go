@@ -45,7 +45,7 @@ func main() {
 
 	inputFileName := getFileName()
 	results := readAndWriteCSV(inputFileName)
-	writeResults(results)
+	writeResults(inputFileName, results)
 
 	fmt.Println("END")
 }
@@ -180,9 +180,39 @@ func readAndWriteCSV(inputFileName string) Results {
 	return results
 }
 
-func writeResults(results Results) {
-	fmt.Printf("Input count: %d\n", results.InputCount)
-	fmt.Printf("Output count: %d\n", results.OutputCount)
-	fmt.Printf("Gross amount: %f\n", results.GrossAmount)
-	fmt.Printf("Net amount: %f\n", results.NetAmount)
+func writeResults(inputFileName string, results Results) {
+	resultsFile, err := os.Create(strings.ReplaceAll(inputFileName, "report.csv", "wallet_report-RESULTS.txt"))
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer resultsFile.Close()
+
+	// CSVs info
+	_, _ = fmt.Fprintf(
+		resultsFile,
+		"Input count= %d\nOutput count= %d\nGross amount= %f\nNet amount=%f\n\n",
+		results.InputCount,
+		results.OutputCount,
+		results.GrossAmount,
+		results.NetAmount,
+	)
+
+	// Payment info
+	fee := results.GrossAmount * 0.004
+	iva := fee * 0.21
+	totalToPay := results.GrossAmount - fee - iva
+
+	_, _ = fmt.Fprintf(resultsFile, "Comisión= %f (0.4%% = bruto * 0.004)\n", fee)
+	_, _ = fmt.Fprintf(resultsFile, "IVA= %f (21%% = comisión * 0.21)\n", iva)
+	_, _ = fmt.Fprintf(resultsFile, "Total a pagar= %f (bruto - comisión - IVA)\n", totalToPay)
+
+	// Logs
+	fmt.Printf("Input count= %d\n", results.InputCount)
+	fmt.Printf("Output count= %d\n", results.OutputCount)
+	fmt.Printf("Gross amount= %f\n", results.GrossAmount)
+	fmt.Printf("Net amount= %f\n\n", results.NetAmount)
+	fmt.Printf("Fee= %f\n", fee)
+	fmt.Printf("IVA= %f\n", iva)
+	fmt.Printf("Total to pay= %f\n", totalToPay)
 }
